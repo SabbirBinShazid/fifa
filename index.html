@@ -12,19 +12,40 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     body {
-      background-color: #000000;
-      color: #ffffff;
+      background-color: #020202;
+      color: #f4f4f5;
       margin: 0;
       overflow: hidden;
       font-family: ui-sans-serif, system-ui, sans-serif;
+      user-select: none;
+    }
+    /* Backdrop-blur for custom overlay controls */
+    .backdrop-blur-custom {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
     }
   </style>
 </head>
-<body class="bg-black text-white h-screen w-screen flex items-center justify-center relative overscroll-none select-none">
+<body class="bg-[#020202] text-[#f4f4f5] h-screen w-screen flex items-center justify-center relative overscroll-none select-none">
 
   <!-- Cinematic Live view -->
-  <div class="absolute inset-0 flex items-center justify-center overflow-hidden">
-    <video id="video-feed" class="transition-all duration-300 ease-out bg-black w-full h-full object-contain" autoplay playsinline></video>
+  <div class="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+    <video id="video-feed" class="transition-all duration-300 ease-out pointer-events-auto bg-black w-full h-full object-contain" autoplay playsinline></video>
   </div>
 
   <!-- Tap to Unmute overlay -->
@@ -42,7 +63,7 @@
   <!-- Error State Display HUD -->
   <div id="error-dialog" class="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 p-6 z-50 text-center hidden">
     <i data-lucide="alert-circle" class="w-12 h-12 text-zinc-500 mb-3"></i>
-    <p id="error-title" class="text-sm font-semibold text-zinc-200 mb-1">Stream Error</p>
+    <p id="error-title" class="text-sm font-semibold text-zinc-200 mb-1">Decryption Session Expired</p>
     <p id="error-body" class="text-zinc-500 text-xs max-w-sm mb-4 leading-relaxed"></p>
     <button id="btn-reload" class="px-4 py-1.5 bg-zinc-900 text-zinc-300 font-medium text-xs rounded-lg hover:bg-zinc-800 border border-white/5 transition">
       Reload Player
@@ -53,38 +74,62 @@
   <div id="controls-dock" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-white/5 py-1.5 px-2 rounded-full shadow-2xl transition-opacity duration-300">
     
     <!-- Aspect Crop -->
-    <button id="btn-crop" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+    <button id="btn-crop" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
       <i data-lucide="crop" class="w-3.5 h-3.5"></i>
       <span id="crop-label">Fit</span>
     </button>
 
     <!-- Rotate -->
-    <button id="btn-rotate" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+    <button id="btn-rotate" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
       <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
       <span id="rotate-label">0°</span>
     </button>
 
+    <!-- Quality (Resolution) selection dropdown -->
+    <div class="relative inline-block text-left">
+      <button id="btn-resolution" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
+        <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+        <span id="resolution-label">Auto</span>
+      </button>
+      <div id="resolution-dropdown-menu" class="absolute bottom-12 left-1/2 -translate-x-1/2 min-w-[140px] bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 z-40 hidden" onclick="event.stopPropagation()">
+        <div class="px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-bold border-b border-white/5 mb-1 text-center font-mono">Quality</div>
+        <div id="resolution-options-list" class="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <!-- Audio Language selection dropdown -->
+    <div class="relative inline-block text-left">
+      <button id="btn-language" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
+        <i data-lucide="languages" class="w-3.5 h-3.5"></i>
+        <span id="language-label" class="capitalize">Auto</span>
+      </button>
+      <div id="language-dropdown-menu" class="absolute bottom-12 left-1/2 -translate-x-1/2 min-w-[130px] bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 z-40 hidden" onclick="event.stopPropagation()">
+        <div class="px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-bold border-b border-white/5 mb-1 text-center font-mono">Language</div>
+        <div id="language-options-list" class="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto"></div>
+      </div>
+    </div>
+
     <!-- Chrome Cast -->
-    <button id="btn-cast" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+    <button id="btn-cast" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
       <i data-lucide="tv" class="w-3.5 h-3.5"></i>
       <span>Cast</span>
     </button>
 
     <!-- Fullscreen Toggle -->
-    <button id="btn-fs" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+    <button id="btn-fs" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
       <i id="fs-icon" data-lucide="maximize" class="w-3.5 h-3.5"></i>
       <span id="fs-label">Fullscreen</span>
     </button>
 
     <!-- Mute/Unmute toggle -->
-    <button id="btn-audio" class="p-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full transition">
+    <button id="btn-audio" class="p-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full transition cursor-pointer">
       <i id="audio-icon" data-lucide="volume-2" class="w-3.5 h-3.5"></i>
     </button>
   </div>
 
   <script>
     // Stream source URL variable
-    const streamUrl = 'https://svc45.main.sl.t-online.de/bpk-tv/KID01037_FUSSBALLTV1_uhd/DASH/index.mpd&k1=1f09d5788fbbb03a053d03cc731f31a9&k2=d493d5a70c793362324638f61d1726ac';
+    const streamUrl = 'https://svc45.main.sl.t-online.de/bpk-tv/KID01037_FUSSBALLTV1_uhd/DASH/index.mpd?k1=1f09d5788fbbb03a053d03cc731f31a9&k2=d493d5a70c793362324638f61d1726ac';
 
     const video = document.getElementById('video-feed');
     const loadingSpinner = document.getElementById('loading-spinner');
@@ -97,6 +142,11 @@
     const btnFs = document.getElementById('btn-fs');
     const fsIcon = document.getElementById('fs-icon');
     const fsLabel = document.getElementById('fs-label');
+
+    const btnResolution = document.getElementById('btn-resolution');
+    const resolutionDropdown = document.getElementById('resolution-dropdown-menu');
+    const btnLanguage = document.getElementById('btn-language');
+    const languageDropdown = document.getElementById('language-dropdown-menu');
 
     let playerInstance = null;
     let isMuted = false;
@@ -111,11 +161,33 @@
       clearTimeout(controlsTimer);
       controlsTimer = setTimeout(() => {
         controlsDock.style.opacity = '0';
-      }, 3000);
+        resolutionDropdown.classList.add('hidden');
+        languageDropdown.classList.add('hidden');
+      }, 4000);
     }
     document.addEventListener('mousemove', resetControlsTimer);
     document.addEventListener('touchstart', resetControlsTimer);
     resetControlsTimer();
+
+    // Toggle dropdowns
+    btnResolution.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resolutionDropdown.classList.toggle('hidden');
+      languageDropdown.classList.add('hidden');
+      resetControlsTimer();
+    });
+
+    btnLanguage.addEventListener('click', (e) => {
+      e.stopPropagation();
+      languageDropdown.classList.toggle('hidden');
+      resolutionDropdown.classList.add('hidden');
+      resetControlsTimer();
+    });
+
+    document.addEventListener('click', () => {
+      resolutionDropdown.classList.add('hidden');
+      languageDropdown.classList.add('hidden');
+    });
 
     function setMuteState(muted) {
       isMuted = muted;
@@ -281,7 +353,6 @@
     window.addEventListener('resize', updateLayoutStyles);
     video.addEventListener('loadedmetadata', updateLayoutStyles);
 
-    // Dynamically parsing DRM ClearKeys out of the URL string safely
     function extractKeysFromUrl(url) {
       let k1 = '1f09d5788fbbb03a053d03cc731f31a9'; // default fallback
       let k2 = 'd493d5a70c793362324638f61d1726ac'; // default fallback
@@ -295,12 +366,149 @@
       return { k1, k2 };
     }
 
+    // Dynamic track mapper and display updater
+    function updateTracksAndLanguages() {
+      if (!playerInstance) return;
+      try {
+        const variantTracks = playerInstance.getVariantTracks() || [];
+        const uniqueHeights = [];
+        variantTracks.forEach(t => {
+          if (t.height && !uniqueHeights.includes(t.height)) {
+            uniqueHeights.push(t.height);
+          }
+        });
+        uniqueHeights.sort((a, b) => b - a);
+
+        const config = playerInstance.getConfiguration();
+        const isAbrEnabled = config && config.streaming && config.streaming.abr && config.streaming.abr.enabled;
+
+        // Resolution mapping
+        const resList = document.getElementById('resolution-options-list');
+        if (resList) {
+          resList.innerHTML = '';
+          
+          // Auto option
+          const autoBtn = document.createElement('button');
+          autoBtn.className = `w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between ${
+            isAbrEnabled 
+              ? 'bg-white/10 text-white font-semibold' 
+              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+          }`;
+          autoBtn.innerHTML = `<span>Auto</span>` + (isAbrEnabled ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>` : '');
+          autoBtn.onclick = (e) => {
+            e.stopPropagation();
+            playerInstance.configure({ streaming: { abr: { enabled: true } } });
+            document.getElementById('resolution-label').textContent = 'Auto';
+            resolutionDropdown.classList.add('hidden');
+            updateTracksAndLanguages();
+          };
+          resList.appendChild(autoBtn);
+
+          // Resolution choices
+          uniqueHeights.forEach(height => {
+            const isSelected = !isAbrEnabled && variantTracks.some(t => t.active && t.height === height);
+            const trackBtn = document.createElement('button');
+            trackBtn.className = `w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between ${
+              isSelected 
+                ? 'bg-white/10 text-white font-semibold' 
+                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            }`;
+            
+            let displayLabel = height >= 2160 ? `${height}p (4K)` : height >= 1080 ? `${height}p (FHD)` : height >= 720 ? `${height}p (HD)` : `${height}p`;
+            trackBtn.innerHTML = `<span>${displayLabel}</span>` + (isSelected ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>` : '');
+            trackBtn.onclick = (e) => {
+              e.stopPropagation();
+              playerInstance.configure({ streaming: { abr: { enabled: false } } });
+              const targetTrack = variantTracks.find(t => t.height === height);
+              if (targetTrack) {
+                playerInstance.selectVariantTrack(targetTrack, true);
+                document.getElementById('resolution-label').textContent = `${height}p`;
+              }
+              resolutionDropdown.classList.add('hidden');
+              updateTracksAndLanguages();
+            };
+            resList.appendChild(trackBtn);
+          });
+        }
+
+        if (isAbrEnabled) {
+          document.getElementById('resolution-label').textContent = 'Auto';
+        } else {
+          const activeTrack = variantTracks.find(t => t.active);
+          if (activeTrack && activeTrack.height) {
+            document.getElementById('resolution-label').textContent = `${activeTrack.height}p`;
+          }
+        }
+
+        // Language lists
+        const audioLangs = playerInstance.getAudioLanguages() || [];
+        const langList = document.getElementById('language-options-list');
+        if (langList) {
+          langList.innerHTML = '';
+          
+          let currentLang = '';
+          const activeTrack = variantTracks.find(t => t.active);
+          if (activeTrack) {
+            currentLang = activeTrack.language || '';
+          }
+
+          const langNames = {
+            en: 'English',
+            de: 'Deutsch',
+            fr: 'Français',
+            es: 'Español',
+            it: 'Italiano',
+            ja: '日本語',
+            ko: '한국어',
+            zh: '中文',
+            pt: 'Português',
+            ru: 'Русский',
+            ar: 'العربية',
+            hi: 'हिन्दी'
+          };
+
+          if (audioLangs.length > 0) {
+            audioLangs.forEach(langCode => {
+              const cleaned = langCode.substring(0, 2).toLowerCase();
+              const isSelected = currentLang.toLowerCase() === langCode.toLowerCase() || currentLang.substring(0, 2).toLowerCase() === cleaned;
+              const langBtn = document.createElement('button');
+              langBtn.className = `w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between ${
+                isSelected 
+                  ? 'bg-white/10 text-white font-semibold' 
+                  : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              }`;
+              
+              const displayName = langNames[cleaned] || langCode.toUpperCase();
+              langBtn.innerHTML = `<span>${displayName}</span>` + (isSelected ? `<span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>` : '');
+              langBtn.onclick = (e) => {
+                e.stopPropagation();
+                playerInstance.selectAudioLanguage(langCode);
+                document.getElementById('language-label').textContent = displayName;
+                languageDropdown.classList.add('hidden');
+                updateTracksAndLanguages();
+              };
+              langList.appendChild(langBtn);
+            });
+            const activeDisplay = langNames[currentLang.substring(0, 2).toLowerCase()] || currentLang.toUpperCase() || 'Auto';
+            document.getElementById('language-label').textContent = activeDisplay;
+          } else {
+            const noLang = document.createElement('div');
+            noLang.className = "px-2 py-2 text-[10px] text-zinc-500 text-center font-mono italic";
+            noLang.textContent = "Single audio stream";
+            langList.appendChild(noLang);
+            document.getElementById('language-label').textContent = 'Auto';
+          }
+        }
+      } catch (err) {
+        console.error('Error tracking configuration change:', err);
+      }
+    }
+
     async function initShaka() {
-      // Local file restriction check (ClearKey relies on secure contexts / MediaKeys APIs)
       if (window.location.protocol === 'file:') {
         showError(
           "Local File Access Blocked",
-          "Modern browsers strictly block Encrypted Media Extensions (ClearKey DRM decryption) on local file links (<code class='bg-zinc-900 border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>file://</code>).<br><br>Please upload this file to <b>GitHub Pages</b> (which serves via secure HTTPS) or use a local dev server (e.g. VSCode Live Server or command <code class='bg-zinc-900 border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>npx serve</code>) to run it."
+          "Modern browsers strictly block Encrypted Media Extensions (ClearKey DRM decryption) on local file links (<code class='bg-[#09090b] border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>file://</code>).<br><br>Please upload this file to <b>GitHub Pages</b> (which serves via secure HTTPS) or use a local dev server (e.g. VSCode Live Server or command <code class='bg-[#09090b] border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>npx serve</code>) to run it."
         );
         return;
       }
@@ -311,13 +519,8 @@
         return;
       }
 
-      // Automatically fix the link's separator if it starts with index.mpd&k1= instead of index.mpd?k1=
       let playableUrl = streamUrl;
-      if (streamUrl.includes('index.mpd&k1=')) {
-        playableUrl = streamUrl.replace('index.mpd&k1=', 'index.mpd?k1=');
-      }
-
-      const keys = extractKeysFromUrl(streamUrl);
+      const keys = extractKeysFromUrl(playableUrl);
 
       playerInstance = new shaka.Player(video);
       playerInstance.configure({
@@ -330,12 +533,17 @@
         showError("DRM Session Failed", "Unable to decrypt or decode the live video stream. The stream token or channel license Keys may have expired.<br><br>Error Code: " + event.detail.code);
       });
 
+      playerInstance.addEventListener('trackschanged', updateTracksAndLanguages);
+      playerInstance.addEventListener('variantchanged', updateTracksAndLanguages);
+      playerInstance.addEventListener('adaptation', updateTracksAndLanguages);
+
       try {
         await playerInstance.load(playableUrl);
         loadingSpinner.style.opacity = '0';
         setTimeout(() => loadingSpinner.classList.add('hidden'), 300);
         
-        // Unmute at startup attempt (if blocked by browser autoplay policies, play muted with TAP TO UNMUTE ribbon)
+        updateTracksAndLanguages();
+
         video.muted = false;
         try {
           await video.play();
@@ -351,7 +559,6 @@
       }
     }
 
-    // Safely execute shaka player initialization regardless of state speed
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
       setTimeout(initShaka, 10);
     } else {
