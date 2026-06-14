@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV Player UHD</title>
+  <!-- Tailwind CSS Engine -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Shaka Player CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      margin: 0;
+      overflow: hidden;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-black text-white h-screen w-screen flex items-center justify-center relative overscroll-none select-none">
+
+  <!-- Cinematic Live view -->
+  <div class="absolute inset-0 flex items-center justify-center overflow-hidden">
+    <video id="video-feed" class="transition-all duration-300 ease-out bg-black w-full h-full object-contain" autoplay playsinline></video>
+  </div>
+
+  <!-- Tap to Unmute overlay -->
+  <div id="unmute-ribbon" class="absolute top-6 left-1/2 -translate-x-1/2 bg-white text-black font-semibold text-xs tracking-wide px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 z-30 cursor-pointer hover:scale-105 transition-all hidden">
+    <i data-lucide="volume-x" class="w-3.5 h-3.5 animate-bounce"></i>
+    <span>TAP TO UNMUTE AUDIO</span>
+  </div>
+
+  <!-- Loading State spinner -->
+  <div id="loading-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-black z-40 pointer-events-none transition-opacity duration-300">
+    <div class="w-10 h-10 border-2 border-white/10 border-t-white rounded-full animate-spin mb-3"></div>
+    <span class="text-zinc-500 font-mono text-[9px] tracking-widest uppercase mb-1">Connecting stream...</span>
+  </div>
+
+  <!-- Error State Display HUD -->
+  <div id="error-dialog" class="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 p-6 z-50 text-center hidden">
+    <i data-lucide="alert-circle" class="w-12 h-12 text-zinc-500 mb-3"></i>
+    <p id="error-title" class="text-sm font-semibold text-zinc-200 mb-1">Stream Error</p>
+    <p id="error-body" class="text-zinc-500 text-xs max-w-sm mb-4 leading-relaxed"></p>
+    <button id="btn-reload" class="px-4 py-1.5 bg-zinc-900 text-zinc-300 font-medium text-xs rounded-lg hover:bg-zinc-800 border border-white/5 transition">
+      Reload Player
+    </button>
+  </div>
+
+  <!-- Floating minimal control dock -->
+  <div id="controls-dock" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-white/5 py-1.5 px-2 rounded-full shadow-2xl transition-opacity duration-300">
+    
+    <!-- Aspect Crop -->
+    <button id="btn-crop" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+      <i data-lucide="crop" class="w-3.5 h-3.5"></i>
+      <span id="crop-label">Fit</span>
+    </button>
+
+    <!-- Rotate -->
+    <button id="btn-rotate" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+      <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+      <span id="rotate-label">0°</span>
+    </button>
+
+    <!-- Chrome Cast -->
+    <button id="btn-cast" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+      <i data-lucide="tv" class="w-3.5 h-3.5"></i>
+      <span>Cast</span>
+    </button>
+
+    <!-- Fullscreen Toggle -->
+    <button id="btn-fs" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition">
+      <i id="fs-icon" data-lucide="maximize" class="w-3.5 h-3.5"></i>
+      <span id="fs-label">Fullscreen</span>
+    </button>
+
+    <!-- Mute/Unmute toggle -->
+    <button id="btn-audio" class="p-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full transition">
+      <i id="audio-icon" data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+    </button>
+  </div>
+
+  <script>
+    // Stream source URL variable
+    const streamUrl = 'https://svc45.main.sl.t-online.de/bpk-tv/KID01037_FUSSBALLTV1_uhd/DASH/index.mpd&k1=1f09d5788fbbb03a053d03cc731f31a9&k2=d493d5a70c793362324638f61d1726ac';
+
+    const video = document.getElementById('video-feed');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const unmuteRibbon = document.getElementById('unmute-ribbon');
+    const controlsDock = document.getElementById('controls-dock');
+    const btnCrop = document.getElementById('btn-crop');
+    const btnRotate = document.getElementById('btn-rotate');
+    const btnCast = document.getElementById('btn-cast');
+    const btnAudio = document.getElementById('btn-audio');
+    const btnFs = document.getElementById('btn-fs');
+    const fsIcon = document.getElementById('fs-icon');
+    const fsLabel = document.getElementById('fs-label');
+
+    let playerInstance = null;
+    let isMuted = false;
+    let rotateAngle = 0;
+    let cropMode = 'contain';
+    let controlsTimer = null;
+
+    lucide.createIcons();
+
+    function resetControlsTimer() {
+      controlsDock.style.opacity = '1';
+      clearTimeout(controlsTimer);
+      controlsTimer = setTimeout(() => {
+        controlsDock.style.opacity = '0';
+      }, 3000);
+    }
+    document.addEventListener('mousemove', resetControlsTimer);
+    document.addEventListener('touchstart', resetControlsTimer);
+    resetControlsTimer();
+
+    function setMuteState(muted) {
+      isMuted = muted;
+      video.muted = muted;
+      const audioIcon = document.getElementById('audio-icon');
+      if (muted) {
+        unmuteRibbon.classList.remove('hidden');
+        audioIcon.setAttribute('data-lucide', 'volume-x');
+      } else {
+        unmuteRibbon.classList.add('hidden');
+        audioIcon.setAttribute('data-lucide', 'volume-2');
+      }
+      lucide.createIcons();
+    }
+    unmuteRibbon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setMuteState(false);
+    });
+    btnAudio.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setMuteState(!isMuted);
+    });
+
+    // Unmute on clicking document body if currently muted
+    document.body.addEventListener('click', () => {
+      if (isMuted) {
+        setMuteState(false);
+      }
+    });
+
+    function showError(title, message) {
+      document.getElementById('error-title').textContent = title;
+      document.getElementById('error-body').innerHTML = message;
+      document.getElementById('error-dialog').classList.remove('hidden');
+      loadingSpinner.style.opacity = '0';
+      setTimeout(() => loadingSpinner.classList.add('hidden'), 300);
+    }
+
+    document.getElementById('btn-reload').addEventListener('click', () => window.location.reload());
+
+    function updateLayoutStyles() {
+      const isRotated = (rotateAngle % 180 === 90);
+      const containerWidth = document.body.clientWidth;
+      const containerHeight = document.body.clientHeight;
+      const nativeRatio = (video.videoWidth && video.videoHeight) ? (video.videoWidth / video.videoHeight) : (16 / 9);
+
+      if (!isRotated) {
+        video.style.transform = `rotate(${rotateAngle}deg)`;
+        video.style.left = '0px';
+        video.style.top = '0px';
+        video.style.width = '100vw';
+        video.style.height = '100vh';
+        video.style.position = 'static';
+        if (cropMode === 'cover') {
+          video.style.objectFit = 'cover';
+        } else if (cropMode === 'fill') {
+          video.style.objectFit = 'fill';
+        } else {
+          video.style.objectFit = 'contain';
+        }
+      } else {
+        const rotatedRatio = 1 / nativeRatio;
+        const containerRatio = containerWidth / containerHeight;
+        let w_rot = 0, h_rot = 0;
+
+        if (cropMode === 'cover') {
+          if (rotatedRatio > containerRatio) {
+            h_rot = containerHeight;
+            w_rot = containerHeight * rotatedRatio;
+          } else {
+            w_rot = containerWidth;
+            h_rot = containerWidth / rotatedRatio;
+          }
+        } else if (cropMode === 'fill') {
+          w_rot = containerWidth;
+          h_rot = containerHeight;
+        } else {
+          if (rotatedRatio > containerRatio) {
+            w_rot = containerWidth;
+            h_rot = containerWidth / rotatedRatio;
+          } else {
+            h_rot = containerHeight;
+            w_rot = containerHeight * rotatedRatio;
+          }
+        }
+
+        video.style.position = 'absolute';
+        video.style.width = `${h_rot}px`;
+        video.style.height = `${w_rot}px`;
+        video.style.objectFit = cropMode === 'fill' ? 'fill' : 'cover';
+        video.style.transform = `rotate(${rotateAngle}deg)`;
+        video.style.left = `${(containerWidth - h_rot) / 2}px`;
+        video.style.top = `${(containerHeight - w_rot) / 2}px`;
+      }
+    }
+
+    const cropLabels = { contain: 'Fit', cover: 'Crop', fill: 'Stretch' };
+    btnCrop.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const modes = ['contain', 'cover', 'fill'];
+      cropMode = modes[(modes.indexOf(cropMode) + 1) % modes.length];
+      document.getElementById('crop-label').textContent = cropLabels[cropMode];
+      updateLayoutStyles();
+    });
+
+    btnRotate.addEventListener('click', (e) => {
+      e.stopPropagation();
+      rotateAngle = (rotateAngle + 90) % 360;
+      document.getElementById('rotate-label').textContent = rotateAngle + '°';
+      updateLayoutStyles();
+    });
+
+    btnCast.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (video.remote && video.remote.prompt) {
+        try {
+          await video.remote.prompt();
+        } catch (err) {
+          console.log('Remote presentation canceled or unsupported.', err);
+        }
+      } else {
+        alert('Casting started. Choose Cast from your native Chrome or browser menu.');
+      }
+    });
+
+    function toggleFullscreen() {
+      const docEl = document.documentElement;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(e => console.log(e));
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(e => console.log(e));
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+    }
+    btnFs.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFullscreen();
+    });
+
+    function onFSChange() {
+      const isCurrentlyFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (isCurrentlyFullscreen) {
+        fsIcon.setAttribute('data-lucide', 'minimize');
+        fsLabel.textContent = 'Exit FS';
+      } else {
+        fsIcon.setAttribute('data-lucide', 'maximize');
+        fsLabel.textContent = 'Fullscreen';
+      }
+      lucide.createIcons();
+    }
+    document.addEventListener('fullscreenchange', onFSChange);
+    document.addEventListener('webkitfullscreenchange', onFSChange);
+    document.addEventListener('mozfullscreenchange', onFSChange);
+    document.addEventListener('msfullscreenchange', onFSChange);
+
+    window.addEventListener('resize', updateLayoutStyles);
+    video.addEventListener('loadedmetadata', updateLayoutStyles);
+
+    // Dynamically parsing DRM ClearKeys out of the URL string safely
+    function extractKeysFromUrl(url) {
+      let k1 = '1f09d5788fbbb03a053d03cc731f31a9'; // default fallback
+      let k2 = 'd493d5a70c793362324638f61d1726ac'; // default fallback
+      
+      const k1Match = url.match(/[?&]k1=([a-fA-F0-9]+)/);
+      const k2Match = url.match(/[?&]k2=([a-fA-F0-9]+)/);
+      
+      if (k1Match) k1 = k1Match[1];
+      if (k2Match) k2 = k2Match[1];
+      
+      return { k1, k2 };
+    }
+
+    async function initShaka() {
+      // Local file restriction check (ClearKey relies on secure contexts / MediaKeys APIs)
+      if (window.location.protocol === 'file:') {
+        showError(
+          "Local File Access Blocked",
+          "Modern browsers strictly block Encrypted Media Extensions (ClearKey DRM decryption) on local file links (<code class='bg-zinc-900 border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>file://</code>).<br><br>Please upload this file to <b>GitHub Pages</b> (which serves via secure HTTPS) or use a local dev server (e.g. VSCode Live Server or command <code class='bg-zinc-900 border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>npx serve</code>) to run it."
+        );
+        return;
+      }
+
+      shaka.polyfill.installAll();
+      if (!shaka.Player.isBrowserSupported()) {
+        showError("Codec Fallback Blocked", "Your browser does not support Shaka Media decoders or Encrypted Media Extensions.");
+        return;
+      }
+
+      // Automatically fix the link's separator if it starts with index.mpd&k1= instead of index.mpd?k1=
+      let playableUrl = streamUrl;
+      if (streamUrl.includes('index.mpd&k1=')) {
+        playableUrl = streamUrl.replace('index.mpd&k1=', 'index.mpd?k1=');
+      }
+
+      const keys = extractKeysFromUrl(streamUrl);
+
+      playerInstance = new shaka.Player(video);
+      playerInstance.configure({
+        drm: { clearKeys: { [keys.k1]: keys.k2 } },
+        streaming: { rebufferingGoal: 2, bufferingGoal: 5 }
+      });
+
+      playerInstance.addEventListener('error', (event) => {
+        console.error('Shaka player internal error:', event.detail);
+        showError("DRM Session Failed", "Unable to decrypt or decode the live video stream. The stream token or channel license Keys may have expired.<br><br>Error Code: " + event.detail.code);
+      });
+
+      try {
+        await playerInstance.load(playableUrl);
+        loadingSpinner.style.opacity = '0';
+        setTimeout(() => loadingSpinner.classList.add('hidden'), 300);
+        
+        // Unmute at startup attempt (if blocked by browser autoplay policies, play muted with TAP TO UNMUTE ribbon)
+        video.muted = false;
+        try {
+          await video.play();
+          setMuteState(false);
+        } catch (autoplayErr) {
+          console.log("Autoplay unmuted blocked. Gracefully fell back to muted autoplay.");
+          setMuteState(true);
+          await video.play();
+        }
+      } catch (err) {
+        console.error('Failed to load stream', err);
+        showError("Connection Failed", "Unable to establish connections to the network stream host. Make sure the link is live and CORS is active on the stream server.");
+      }
+    }
+
+    // Safely execute shaka player initialization regardless of state speed
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(initShaka, 10);
+    } else {
+      document.addEventListener('DOMContentLoaded', initShaka);
+    }
+  </script>
+</body>
+</html>
