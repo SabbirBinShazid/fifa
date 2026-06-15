@@ -3,567 +3,440 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IPTV Player UHD</title>
-  <!-- Tailwind CSS Engine -->
+  <title>Minimal IPTV Stream Player</title>
+  
+  <!-- Tailwind CSS Play CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Shaka Player CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+  
+  <!-- HLS.js for full cross-browser live stream support -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+
   <style>
-    body {
-      background-color: #020202;
-      color: #f4f4f5;
-      margin: 0;
-      overflow: hidden;
-      font-family: ui-sans-serif, system-ui, sans-serif;
-      user-select: none;
+    /* Custom style slider for the volume picker */
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ef4444;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      transition: transform 0.1s ease-in-out;
     }
-    /* Backdrop-blur for custom overlay controls */
-    .backdrop-blur-custom {
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
-    /* Custom scrollbars */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.2);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3);
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
     }
   </style>
 </head>
-<body class="bg-[#020202] text-[#f4f4f5] h-screen w-screen flex items-center justify-center relative overscroll-none select-none">
+<body class="bg-black text-zinc-100 font-sans min-h-screen flex flex-col items-center justify-center p-4 md:p-8 relative overflow-hidden bg-[radial-gradient(circle_at_50%_50%,#0a0a0c_0%,#000000_100%)]">
 
-  <!-- Cinematic Live view -->
-  <div class="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-    <video id="video-feed" class="transition-all duration-300 ease-out pointer-events-auto bg-black w-full h-full object-contain" autoplay playsinline></video>
-  </div>
+  <!-- Aesthetic Ambient Background Glow -->
+  <div class="absolute inset-0 bg-gradient-to-b from-zinc-950/20 via-black to-zinc-950/20 pointer-events-none"></div>
+  <div class="absolute top-1/4 left-1/4 w-[350px] h-[350px] bg-red-600/5 blur-[100px] rounded-full pointer-events-none animate-pulse"></div>
+  <div class="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] bg-zinc-800/10 blur-[100px] rounded-full pointer-events-none"></div>
 
-  <!-- Tap to Unmute overlay -->
-  <div id="unmute-ribbon" class="absolute top-6 left-1/2 -translate-x-1/2 bg-white text-black font-semibold text-xs tracking-wide px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 z-30 cursor-pointer hover:scale-105 transition-all hidden">
-    <i data-lucide="volume-x" class="w-3.5 h-3.5 animate-bounce"></i>
-    <span>TAP TO UNMUTE AUDIO</span>
-  </div>
+  <!-- Header Section with Live Status Badge -->
+  <header class="w-full max-w-5xl flex flex-col items-center justify-center text-center gap-1.5 mb-6 z-10 select-none">
+    <div class="flex items-center gap-2">
+      <div class="relative flex items-center justify-center">
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping absolute block"></span>
+        <span class="w-2 h-2 rounded-full bg-red-600 relative block border border-black/80"></span>
+      </div>
+      <h1 class="text-xs font-black tracking-[0.3em] text-white/50 uppercase">
+        LIVE BROADCAST FEED
+      </h1>
+    </div>
+    <p id="active-stream-title" class="text-[11px] font-mono tracking-wider text-zinc-400 max-w-xl truncate px-4">
+      Loading Broadcast...
+    </p>
+  </header>
 
-  <!-- Loading State spinner -->
-  <div id="loading-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-black z-40 pointer-events-none transition-opacity duration-300">
-    <div class="w-10 h-10 border-2 border-white/10 border-t-white rounded-full animate-spin mb-3"></div>
-    <span class="text-zinc-500 font-mono text-[9px] tracking-widest uppercase mb-1">Connecting stream...</span>
-  </div>
-
-  <!-- Error State Display HUD -->
-  <div id="error-dialog" class="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 p-6 z-50 text-center hidden">
-    <i data-lucide="alert-circle" class="w-12 h-12 text-zinc-500 mb-3"></i>
-    <p id="error-title" class="text-sm font-semibold text-zinc-200 mb-1">Decryption Session Expired</p>
-    <p id="error-body" class="text-zinc-500 text-xs max-w-sm mb-4 leading-relaxed"></p>
-    <button id="btn-reload" class="px-4 py-1.5 bg-zinc-900 text-zinc-300 font-medium text-xs rounded-lg hover:bg-zinc-800 border border-white/5 transition">
-      Reload Player
-    </button>
-  </div>
-
-  <!-- Floating minimal control dock -->
-  <div id="controls-dock" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-white/5 py-1.5 px-2 rounded-full shadow-2xl transition-opacity duration-300">
+  <!-- Player Aspect-Video Display Card -->
+  <div id="iptv-player-container" class="relative w-full max-w-5xl aspect-video sm:rounded-2xl border border-white/5 bg-black overflow-hidden shadow-2xl shadow-black/80 flex items-center justify-center z-10 group">
     
-    <!-- Aspect Crop -->
-    <button id="btn-crop" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
-      <i data-lucide="crop" class="w-3.5 h-3.5"></i>
-      <span id="crop-label">Fit</span>
-    </button>
+    <!-- Video Element Canvas -->
+    <div id="viewport-wrapper" class="w-full h-full flex items-center justify-center transition-all duration-300 origin-center bg-black">
+      <video 
+        id="video-player" 
+        class="w-full h-full object-contain pointer-events-none"
+        playsinline
+        preload="auto"
+      ></video>
+    </div>
 
-    <!-- Rotate -->
-    <button id="btn-rotate" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
-      <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
-      <span id="rotate-label">0°</span>
-    </button>
-
-    <!-- Quality (Resolution) selection dropdown -->
-    <div class="relative inline-block text-left">
-      <button id="btn-resolution" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
-        <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
-        <span id="resolution-label">Auto</span>
-      </button>
-      <div id="resolution-dropdown-menu" class="absolute bottom-12 left-1/2 -translate-x-1/2 min-w-[140px] bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 z-40 hidden" onclick="event.stopPropagation()">
-        <div class="px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-bold border-b border-white/5 mb-1 text-center font-mono">Quality</div>
-        <div id="resolution-options-list" class="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto"></div>
+    <!-- Central Buffering / Loading Indicator Spinner -->
+    <div id="loader-hud" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md hidden pointer-events-none transition-all">
+      <div class="p-5 rounded-full bg-black/60 border border-white/10 flex items-center justify-center">
+        <i data-lucide="refresh-cw" class="text-red-500 animate-spin w-8 h-8"></i>
       </div>
     </div>
 
-    <!-- Audio Language selection dropdown -->
-    <div class="relative inline-block text-left">
-      <button id="btn-language" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
-        <i data-lucide="languages" class="w-3.5 h-3.5"></i>
-        <span id="language-label" class="capitalize">Auto</span>
-      </button>
-      <div id="language-dropdown-menu" class="absolute bottom-12 left-1/2 -translate-x-1/2 min-w-[130px] bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-1.5 shadow-2xl flex flex-col gap-0.5 z-40 hidden" onclick="event.stopPropagation()">
-        <div class="px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-bold border-b border-white/5 mb-1 text-center font-mono">Language</div>
-        <div id="language-options-list" class="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto"></div>
+    <!-- Error State Overlay Indicator -->
+    <div id="error-hud" class="absolute inset-x-4 inset-y-4 md:inset-x-0 md:inset-y-0 rounded-xl bg-zinc-950/95 backdrop-blur-xl border border-red-500/25 flex flex-col items-center justify-center gap-3.5 text-center hidden z-30">
+      <div class="w-12 h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/5">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
       </div>
+      <div class="flex flex-col gap-1 px-4">
+        <p class="text-sm font-semibold tracking-wide text-white">Stream Failed to Connect</p>
+        <p id="error-message-text" class="text-xs text-zinc-400 leading-relaxed max-w-sm ml-auto mr-auto">
+          The stream link may be expired, geo-blocked, or requires fresh server configuration credentials.
+        </p>
+      </div>
+      <button id="btn-error-retry" class="mt-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-xl shadow-red-600/20 active:scale-95">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        Retry Live Connection
+      </button>
     </div>
 
-    <!-- Chrome Cast -->
-    <button id="btn-cast" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
-      <i data-lucide="tv" class="w-3.5 h-3.5"></i>
-      <span>Cast</span>
-    </button>
+    <!-- Custom Control Layer -->
+    <div id="controls-panel" class="absolute inset-0 flex flex-col justify-between z-10 transition-opacity duration-300 opacity-100">
+      
+      <!-- Top URL / Status Bar HUD -->
+       <!-- <div class="w-full flex items-start justify-between p-4 sm:p-6 bg-gradient-to-b from-black/90 to-transparent pointer-events-auto">
+        <div class="flex flex-col gap-1 select-none bg-black/40 backdrop-blur-md px-3 py-2 rounded-xl border border-white/5 max-w-[200px] sm:max-w-xs md:max-w-md">
+          <span class="text-[8px] uppercase tracking-[0.25em] text-zinc-500 font-extrabold leading-none">Source URL</span>
+          <span id="active-stream-url" class="text-[10px] font-mono text-zinc-300 font-medium truncate block select-all"></span>
+        </div>
+        
+        <div id="connection-status-badge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-mono border backdrop-blur-md bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+          <i id="badge-activity-icon" data-lucide="activity" class="w-3.5 h-3.5"></i>
+          <span id="badge-status-text" class="capitalize font-bold tracking-wider">Playable</span>
+        </div>
+      </div>   -->
 
-    <!-- Fullscreen Toggle -->
-    <button id="btn-fs" class="px-3.5 py-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition cursor-pointer">
-      <i id="fs-icon" data-lucide="maximize" class="w-3.5 h-3.5"></i>
-      <span id="fs-label">Fullscreen</span>
-    </button>
+      <!-- Play Overlay Central Toggle -->
+      <div id="play-overlay" class="flex-grow flex items-center justify-center p-4 cursor-pointer">
+        <div id="play-center-btn" class="relative flex flex-col items-center gap-4 transition-all duration-300 hover:scale-105 active:scale-95">
+          <div class="absolute inset-0 bg-red-500/15 blur-[50px] rounded-full scale-150 animate-pulse"></div>
+          <div class="w-16 h-16 md:w-20 md:h-20 rounded-full border border-white/10 flex items-center justify-center bg-black/40 backdrop-blur-2xl text-white shadow-2xl hover:border-red-500 hover:text-red-400">
+            <i data-lucide="play" class="w-7 h-7 fill-current ml-0.5 text-red-500"></i>
+          </div>
+        </div>
+      </div>
 
-    <!-- Mute/Unmute toggle -->
-    <button id="btn-audio" class="p-1.5 hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-full transition cursor-pointer">
-      <i id="audio-icon" data-lucide="volume-2" class="w-3.5 h-3.5"></i>
-    </button>
+      <!-- Bottom Glass Control Pod Container -->
+      <div class="w-full flex flex-col items-center p-6 bg-gradient-to-t from-black/95 via-black/40 to-transparent">
+        <div class="flex items-center justify-center gap-2.5 sm:gap-4 md:gap-5 px-6 py-2.5 bg-zinc-950/70 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl">
+          
+          <!-- Play / Pause Switch -->
+          <button id="btn-bottom-play" class="group flex flex-col items-center gap-1 bg-transparent hover:text-white transition-all cursor-pointer">
+            <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-red-500 hover:bg-white hover:text-black transition-all">
+              <i id="btn-play-icon" data-lucide="play" class="w-4 h-4 fill-current"></i>
+            </div>
+            <span class="text-[8px] uppercase tracking-widest font-bold text-zinc-500 group-hover:text-white">Play</span>
+          </button>
+
+          <div class="h-6 w-[1px] bg-white/10"></div>
+
+          <!-- Audio Volume / Mute trigger controls -->
+          <div class="flex items-center gap-2" id="volume-control-group">
+            <button id="btn-volume-toggle" class="group flex flex-col items-center gap-1 bg-transparent hover:text-white transition-all cursor-pointer">
+              <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:bg-white hover:text-black transition-all">
+                <i id="btn-volume-icon" data-lucide="volume-2" class="w-4 h-4"></i>
+              </div>
+              <span class="text-[8px] uppercase tracking-widest font-bold text-zinc-500 group-hover:text-white">Mute</span>
+            </button>
+            <input 
+              id="volume-slider" 
+              type="range" 
+              min="0" 
+              max="1" 
+              step="0.05" 
+              value="1" 
+              class="w-14 h-1 bg-zinc-800 rounded-lg cursor-pointer accent-red-600 border border-white/5"
+            />
+          </div>
+
+          <div class="h-6 w-[1px] bg-white/10"></div>
+
+          <!-- Video Rotation (90 deg increments) -->
+          <button id="btn-rotate-view" class="group flex flex-col items-center gap-1 bg-transparent hover:text-white transition-all cursor-pointer" title="Rotate stream view">
+            <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:bg-white hover:text-black transition-all">
+              <i data-lucide="rotate-cw" id="rotate-icon-indicator" class="w-4 h-4 transition-transform"></i>
+            </div>
+            <span class="text-[8px] uppercase tracking-widest font-bold text-zinc-500 group-hover:text-white">Rotate</span>
+          </button>
+
+          <div class="h-6 w-[1px] bg-white/10"></div>
+
+          <!-- Native Fullscreen Mode -->
+          <button id="btn-fullscreen" class="group flex flex-col items-center gap-1 bg-transparent hover:text-white transition-all cursor-pointer">
+            <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 hover:bg-white hover:text-black transition-all">
+              <i id="btn-fullscreen-icon" data-lucide="maximize" class="w-4 h-4"></i>
+            </div>
+            <span class="text-[8px] uppercase tracking-widest font-bold text-zinc-500 group-hover:text-white">Full</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
   </div>
+
+  <footer class="mt-6 text-center text-[9px] tracking-[0.25em] text-zinc-500 uppercase font-medium select-none pointer-events-none">
+    <div class="flex items-center justify-center gap-3">
+      <span>Double click window for Fullscreen</span>
+      <span>•</span>
+      <span>Space key to Play / Pause</span>
+    </div>
+  </footer>
 
   <script>
-    // Stream source URL variable
-    const streamUrl = 'https://svc45.main.sl.t-online.de/bpk-tv/KID01037_FUSSBALLTV1_uhd/DASH/index.mpd?k1=1f09d5788fbbb03a053d03cc731f31a9&k2=d493d5a70c793362324638f61d1726ac';
+    // =========================================================================
+    // 1. EDIT YOUR M3U8 STREAM AND LABELS HERE:
+    // =========================================================================
+    const STREAM_URL = "https://flussonic.defineatoz.com/TSports2/tracks-v1a1/mono.m3u8?remote=120.89.64.93&token=37afae3b8f03ad8a4e5bac9b614629b81850dca8-b3d4062672786f1ceffd57d4d00895d7-1781503852-1781493052";
+    const STREAM_TITLE = "T Sports 2 Live Stream Feed";
 
-    const video = document.getElementById('video-feed');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const unmuteRibbon = document.getElementById('unmute-ribbon');
-    const controlsDock = document.getElementById('controls-dock');
-    const btnCrop = document.getElementById('btn-crop');
-    const btnRotate = document.getElementById('btn-rotate');
-    const btnCast = document.getElementById('btn-cast');
-    const btnAudio = document.getElementById('btn-audio');
-    const btnFs = document.getElementById('btn-fs');
-    const fsIcon = document.getElementById('fs-icon');
-    const fsLabel = document.getElementById('fs-label');
+    // Playback State Configuration
+    let hlsInstance = null;
+    let rotationAngle = 0;
+    let idleTimer = null;
 
-    const btnResolution = document.getElementById('btn-resolution');
-    const resolutionDropdown = document.getElementById('resolution-dropdown-menu');
-    const btnLanguage = document.getElementById('btn-language');
-    const languageDropdown = document.getElementById('language-dropdown-menu');
+    // Element binding
+    const video = document.getElementById('video-player');
+    const viewportWrapper = document.getElementById('viewport-wrapper');
+    const playerContainer = document.getElementById('iptv-player-container');
+    const playOverlay = document.getElementById('play-overlay');
+    const loaderHud = document.getElementById('loader-hud');
+    const errorHud = document.getElementById('error-hud');
+    const errorMessageText = document.getElementById('error-message-text');
 
-    let playerInstance = null;
-    let isMuted = false;
-    let rotateAngle = 0;
-    let cropMode = 'contain';
-    let controlsTimer = null;
+    const btnBottomPlay = document.getElementById('btn-bottom-play');
+    const btnPlayIcon = document.getElementById('btn-play-icon');
+    const badgeStatusText = document.getElementById('badge-status-text');
+    const activeStreamTitle = document.getElementById('active-stream-title');
+    const activeStreamUrl = document.getElementById('active-stream-url');
+    
+    const btnVolumeToggle = document.getElementById('btn-volume-toggle');
+    const btnVolumeIcon = document.getElementById('btn-volume-icon');
+    const volumeSlider = document.getElementById('volume-slider');
+    const btnRotateView = document.getElementById('btn-rotate-view');
+    const rotateIconIndicator = document.getElementById('rotate-icon-indicator');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    const btnFullscreenIcon = document.getElementById('btn-fullscreen-icon');
+    const controlsPanel = document.getElementById('controls-panel');
+    const btnErrorRetry = document.getElementById('btn-error-retry');
 
+    // Setup Lucide icons
     lucide.createIcons();
 
-    function resetControlsTimer() {
-      controlsDock.style.opacity = '1';
-      clearTimeout(controlsTimer);
-      controlsTimer = setTimeout(() => {
-        controlsDock.style.opacity = '0';
-        resolutionDropdown.classList.add('hidden');
-        languageDropdown.classList.add('hidden');
-      }, 4000);
+    function updateHUDLabels() {
+      activeStreamTitle.textContent = STREAM_TITLE;
+      activeStreamUrl.textContent = STREAM_URL;
     }
-    document.addEventListener('mousemove', resetControlsTimer);
-    document.addEventListener('touchstart', resetControlsTimer);
-    resetControlsTimer();
 
-    // Toggle dropdowns
-    btnResolution.addEventListener('click', (e) => {
-      e.stopPropagation();
-      resolutionDropdown.classList.toggle('hidden');
-      languageDropdown.classList.add('hidden');
-      resetControlsTimer();
-    });
-
-    btnLanguage.addEventListener('click', (e) => {
-      e.stopPropagation();
-      languageDropdown.classList.toggle('hidden');
-      resolutionDropdown.classList.add('hidden');
-      resetControlsTimer();
-    });
-
-    document.addEventListener('click', () => {
-      resolutionDropdown.classList.add('hidden');
-      languageDropdown.classList.add('hidden');
-    });
-
-    function setMuteState(muted) {
-      isMuted = muted;
-      video.muted = muted;
-      const audioIcon = document.getElementById('audio-icon');
-      if (muted) {
-        unmuteRibbon.classList.remove('hidden');
-        audioIcon.setAttribute('data-lucide', 'volume-x');
-      } else {
-        unmuteRibbon.classList.add('hidden');
-        audioIcon.setAttribute('data-lucide', 'volume-2');
+    // Instantiating standard dynamic HLS buffer connection
+    function loadHlsStream(url) {
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
       }
-      lucide.createIcons();
-    }
-    unmuteRibbon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      setMuteState(false);
-    });
-    btnAudio.addEventListener('click', (e) => {
-      e.stopPropagation();
-      setMuteState(!isMuted);
-    });
 
-    // Unmute on clicking document body if currently muted
-    document.body.addEventListener('click', () => {
-      if (isMuted) {
-        setMuteState(false);
-      }
-    });
+      errorHud.classList.add('hidden');
+      loaderHud.classList.remove('hidden');
+      setConnectionStatusBadge('connecting');
 
-    function showError(title, message) {
-      document.getElementById('error-title').textContent = title;
-      document.getElementById('error-body').innerHTML = message;
-      document.getElementById('error-dialog').classList.remove('hidden');
-      loadingSpinner.style.opacity = '0';
-      setTimeout(() => loadingSpinner.classList.add('hidden'), 300);
-    }
+      if (Hls.isSupported()) {
+        hlsInstance = new Hls({
+          maxMaxBufferLength: 8,
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 0
+        });
 
-    document.getElementById('btn-reload').addEventListener('click', () => window.location.reload());
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(video);
 
-    function updateLayoutStyles() {
-      const isRotated = (rotateAngle % 180 === 90);
-      const containerWidth = document.body.clientWidth;
-      const containerHeight = document.body.clientHeight;
-      const nativeRatio = (video.videoWidth && video.videoHeight) ? (video.videoWidth / video.videoHeight) : (16 / 9);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function () {
+          loaderHud.classList.add('hidden');
+          setConnectionStatusBadge('playable');
+        });
 
-      if (!isRotated) {
-        video.style.transform = `rotate(${rotateAngle}deg)`;
-        video.style.left = '0px';
-        video.style.top = '0px';
-        video.style.width = '100vw';
-        video.style.height = '100vh';
-        video.style.position = 'static';
-        if (cropMode === 'cover') {
-          video.style.objectFit = 'cover';
-        } else if (cropMode === 'fill') {
-          video.style.objectFit = 'fill';
-        } else {
-          video.style.objectFit = 'contain';
-        }
-      } else {
-        const rotatedRatio = 1 / nativeRatio;
-        const containerRatio = containerWidth / containerHeight;
-        let w_rot = 0, h_rot = 0;
-
-        if (cropMode === 'cover') {
-          if (rotatedRatio > containerRatio) {
-            h_rot = containerHeight;
-            w_rot = containerHeight * rotatedRatio;
-          } else {
-            w_rot = containerWidth;
-            h_rot = containerWidth / rotatedRatio;
-          }
-        } else if (cropMode === 'fill') {
-          w_rot = containerWidth;
-          h_rot = containerHeight;
-        } else {
-          if (rotatedRatio > containerRatio) {
-            w_rot = containerWidth;
-            h_rot = containerWidth / rotatedRatio;
-          } else {
-            h_rot = containerHeight;
-            w_rot = containerHeight * rotatedRatio;
-          }
-        }
-
-        video.style.position = 'absolute';
-        video.style.width = `${h_rot}px`;
-        video.style.height = `${w_rot}px`;
-        video.style.objectFit = cropMode === 'fill' ? 'fill' : 'cover';
-        video.style.transform = `rotate(${rotateAngle}deg)`;
-        video.style.left = `${(containerWidth - h_rot) / 2}px`;
-        video.style.top = `${(containerHeight - w_rot) / 2}px`;
-      }
-    }
-
-    const cropLabels = { contain: 'Fit', cover: 'Crop', fill: 'Stretch' };
-    btnCrop.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const modes = ['contain', 'cover', 'fill'];
-      cropMode = modes[(modes.indexOf(cropMode) + 1) % modes.length];
-      document.getElementById('crop-label').textContent = cropLabels[cropMode];
-      updateLayoutStyles();
-    });
-
-    btnRotate.addEventListener('click', (e) => {
-      e.stopPropagation();
-      rotateAngle = (rotateAngle + 90) % 360;
-      document.getElementById('rotate-label').textContent = rotateAngle + '°';
-      updateLayoutStyles();
-    });
-
-    btnCast.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (video.remote && video.remote.prompt) {
-        try {
-          await video.remote.prompt();
-        } catch (err) {
-          console.log('Remote presentation canceled or unsupported.', err);
-        }
-      } else {
-        alert('Casting started. Choose Cast from your native Chrome or browser menu.');
-      }
-    });
-
-    function toggleFullscreen() {
-      const docEl = document.documentElement;
-      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (docEl.requestFullscreen) {
-          docEl.requestFullscreen().catch(e => console.log(e));
-        } else if (docEl.webkitRequestFullscreen) {
-          docEl.webkitRequestFullscreen();
-        }
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen().catch(e => console.log(e));
-        } else if (document.webkitExitFullscreen) {
-          document.webkitExitFullscreen();
-        }
-      }
-    }
-    btnFs.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleFullscreen();
-    });
-
-    function onFSChange() {
-      const isCurrentlyFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      if (isCurrentlyFullscreen) {
-        fsIcon.setAttribute('data-lucide', 'minimize');
-        fsLabel.textContent = 'Exit FS';
-      } else {
-        fsIcon.setAttribute('data-lucide', 'maximize');
-        fsLabel.textContent = 'Fullscreen';
-      }
-      lucide.createIcons();
-    }
-    document.addEventListener('fullscreenchange', onFSChange);
-    document.addEventListener('webkitfullscreenchange', onFSChange);
-    document.addEventListener('mozfullscreenchange', onFSChange);
-    document.addEventListener('msfullscreenchange', onFSChange);
-
-    window.addEventListener('resize', updateLayoutStyles);
-    video.addEventListener('loadedmetadata', updateLayoutStyles);
-
-    function extractKeysFromUrl(url) {
-      let k1 = '1f09d5788fbbb03a053d03cc731f31a9'; // default fallback
-      let k2 = 'd493d5a70c793362324638f61d1726ac'; // default fallback
-      
-      const k1Match = url.match(/[?&]k1=([a-fA-F0-9]+)/);
-      const k2Match = url.match(/[?&]k2=([a-fA-F0-9]+)/);
-      
-      if (k1Match) k1 = k1Match[1];
-      if (k2Match) k2 = k2Match[1];
-      
-      return { k1, k2 };
-    }
-
-    // Dynamic track mapper and display updater
-    function updateTracksAndLanguages() {
-      if (!playerInstance) return;
-      try {
-        const variantTracks = playerInstance.getVariantTracks() || [];
-        const uniqueHeights = [];
-        variantTracks.forEach(t => {
-          if (t.height && !uniqueHeights.includes(t.height)) {
-            uniqueHeights.push(t.height);
+        hlsInstance.on(Hls.Events.ERROR, function (event, data) {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.error("Fatal: HLS stream chunks loading network error");
+                hlsInstance.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.error("Fatal: HLS audio/video decoding media error");
+                hlsInstance.recoverMediaError();
+                break;
+              default:
+                triggerErrorHUD(data.details || "Connection dropped or blocked");
+                break;
+            }
           }
         });
-        uniqueHeights.sort((a, b) => b - a);
-
-        const config = playerInstance.getConfiguration();
-        const isAbrEnabled = config && config.streaming && config.streaming.abr && config.streaming.abr.enabled;
-
-        // Resolution mapping
-        const resList = document.getElementById('resolution-options-list');
-        if (resList) {
-          resList.innerHTML = '';
-          
-          // Auto option
-          const autoBtn = document.createElement('button');
-          autoBtn.className = `w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between ${
-            isAbrEnabled 
-              ? 'bg-white/10 text-white font-semibold' 
-              : 'text-zinc-400 hover:text-white hover:bg-white/5'
-          }`;
-          autoBtn.innerHTML = `<span>Auto</span>` + (isAbrEnabled ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>` : '');
-          autoBtn.onclick = (e) => {
-            e.stopPropagation();
-            playerInstance.configure({ streaming: { abr: { enabled: true } } });
-            document.getElementById('resolution-label').textContent = 'Auto';
-            resolutionDropdown.classList.add('hidden');
-            updateTracksAndLanguages();
-          };
-          resList.appendChild(autoBtn);
-
-          // Resolution choices
-          uniqueHeights.forEach(height => {
-            const isSelected = !isAbrEnabled && variantTracks.some(t => t.active && t.height === height);
-            const trackBtn = document.createElement('button');
-            trackBtn.className = `w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between ${
-              isSelected 
-                ? 'bg-white/10 text-white font-semibold' 
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            }`;
-            
-            let displayLabel = height >= 2160 ? `${height}p (4K)` : height >= 1080 ? `${height}p (FHD)` : height >= 720 ? `${height}p (HD)` : `${height}p`;
-            trackBtn.innerHTML = `<span>${displayLabel}</span>` + (isSelected ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>` : '');
-            trackBtn.onclick = (e) => {
-              e.stopPropagation();
-              playerInstance.configure({ streaming: { abr: { enabled: false } } });
-              const targetTrack = variantTracks.find(t => t.height === height);
-              if (targetTrack) {
-                playerInstance.selectVariantTrack(targetTrack, true);
-                document.getElementById('resolution-label').textContent = `${height}p`;
-              }
-              resolutionDropdown.classList.add('hidden');
-              updateTracksAndLanguages();
-            };
-            resList.appendChild(trackBtn);
-          });
-        }
-
-        if (isAbrEnabled) {
-          document.getElementById('resolution-label').textContent = 'Auto';
-        } else {
-          const activeTrack = variantTracks.find(t => t.active);
-          if (activeTrack && activeTrack.height) {
-            document.getElementById('resolution-label').textContent = `${activeTrack.height}p`;
-          }
-        }
-
-        // Language lists
-        const audioLangs = playerInstance.getAudioLanguages() || [];
-        const langList = document.getElementById('language-options-list');
-        if (langList) {
-          langList.innerHTML = '';
-          
-          let currentLang = '';
-          const activeTrack = variantTracks.find(t => t.active);
-          if (activeTrack) {
-            currentLang = activeTrack.language || '';
-          }
-
-          const langNames = {
-            en: 'English',
-            de: 'Deutsch',
-            fr: 'Français',
-            es: 'Español',
-            it: 'Italiano',
-            ja: '日本語',
-            ko: '한국어',
-            zh: '中文',
-            pt: 'Português',
-            ru: 'Русский',
-            ar: 'العربية',
-            hi: 'हिन्दी'
-          };
-
-          if (audioLangs.length > 0) {
-            audioLangs.forEach(langCode => {
-              const cleaned = langCode.substring(0, 2).toLowerCase();
-              const isSelected = currentLang.toLowerCase() === langCode.toLowerCase() || currentLang.substring(0, 2).toLowerCase() === cleaned;
-              const langBtn = document.createElement('button');
-              langBtn.className = `w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between ${
-                isSelected 
-                  ? 'bg-white/10 text-white font-semibold' 
-                  : 'text-zinc-400 hover:text-white hover:bg-white/5'
-              }`;
-              
-              const displayName = langNames[cleaned] || langCode.toUpperCase();
-              langBtn.innerHTML = `<span>${displayName}</span>` + (isSelected ? `<span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>` : '');
-              langBtn.onclick = (e) => {
-                e.stopPropagation();
-                playerInstance.selectAudioLanguage(langCode);
-                document.getElementById('language-label').textContent = displayName;
-                languageDropdown.classList.add('hidden');
-                updateTracksAndLanguages();
-              };
-              langList.appendChild(langBtn);
-            });
-            const activeDisplay = langNames[currentLang.substring(0, 2).toLowerCase()] || currentLang.toUpperCase() || 'Auto';
-            document.getElementById('language-label').textContent = activeDisplay;
-          } else {
-            const noLang = document.createElement('div');
-            noLang.className = "px-2 py-2 text-[10px] text-zinc-500 text-center font-mono italic";
-            noLang.textContent = "Single audio stream";
-            langList.appendChild(noLang);
-            document.getElementById('language-label').textContent = 'Auto';
-          }
-        }
-      } catch (err) {
-        console.error('Error tracking configuration change:', err);
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Fallback for native Safari
+        video.src = url;
+        video.addEventListener('loadedmetadata', function() {
+          loaderHud.classList.add('hidden');
+          setConnectionStatusBadge('playable');
+        });
+      } else {
+        triggerErrorHUD("HLS live streaming is not supported by your current browser.");
       }
     }
 
-    async function initShaka() {
-      if (window.location.protocol === 'file:') {
-        showError(
-          "Local File Access Blocked",
-          "Modern browsers strictly block Encrypted Media Extensions (ClearKey DRM decryption) on local file links (<code class='bg-[#09090b] border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>file://</code>).<br><br>Please upload this file to <b>GitHub Pages</b> (which serves via secure HTTPS) or use a local dev server (e.g. VSCode Live Server or command <code class='bg-[#09090b] border border-white/5 font-mono text-zinc-300 px-1 py-0.5 rounded'>npx serve</code>) to run it."
-        );
-        return;
+    function triggerErrorHUD(detailStr) {
+      loaderHud.classList.add('hidden');
+      errorHud.classList.remove('hidden');
+      setConnectionStatusBadge('failed');
+      const hints = detailStr.includes('manifestLoadError') ? 
+        "Verify your IP address parameters, tokens, or check CORS firewall rules for streaming." : 
+        "Check your network configuration or swap the stream URL in the code.";
+      errorMessageText.textContent = `Reason: ${detailStr} (${hints})`;
+    }
+
+    function setConnectionStatusBadge(status) {
+      const badge = document.getElementById('connection-status-badge');
+      if (status === 'playable') {
+        badge.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-mono border backdrop-blur-md bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+        badgeStatusText.textContent = "Live Feed Connected";
+      } else if (status === 'connecting') {
+        badge.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-mono border backdrop-blur-md bg-amber-500/10 border-amber-500/20 text-amber-400";
+        badgeStatusText.textContent = "Connecting Live";
+      } else {
+        badge.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-mono border backdrop-blur-md bg-red-500/10 border-red-500/20 text-red-400";
+        badgeStatusText.textContent = "Offline / Interrupted";
       }
+    }
 
-      shaka.polyfill.installAll();
-      if (!shaka.Player.isBrowserSupported()) {
-        showError("Codec Fallback Blocked", "Your browser does not support Shaka Media decoders or Encrypted Media Extensions.");
-        return;
+    function togglePlay() {
+      if (video.paused) {
+        video.play().then(() => {
+          setIsPlayingState(true);
+        }).catch(err => {
+          console.warn("Auto-play blocked by host constraints: requires viewport interactive gesture.");
+          setIsPlayingState(false);
+        });
+      } else {
+        video.pause();
+        setIsPlayingState(false);
       }
+    }
 
-      let playableUrl = streamUrl;
-      const keys = extractKeysFromUrl(playableUrl);
+    function setIsPlayingState(playing) {
+      if (playing) {
+        playOverlay.classList.add('hidden');
+        btnPlayIcon.setAttribute('data-lucide', 'pause');
+        btnBottomPlay.querySelector('span').textContent = "Pause";
+      } else {
+        playOverlay.classList.remove('hidden');
+        btnPlayIcon.setAttribute('data-lucide', 'play');
+        btnBottomPlay.querySelector('span').textContent = "Play";
+      }
+      lucide.createIcons();
+    }
 
-      playerInstance = new shaka.Player(video);
-      playerInstance.configure({
-        drm: { clearKeys: { [keys.k1]: keys.k2 } },
-        streaming: { rebufferingGoal: 2, bufferingGoal: 5 }
-      });
+    // Hooking up video event handlers
+    video.addEventListener('play', () => setIsPlayingState(true));
+    video.addEventListener('pause', () => setIsPlayingState(false));
+    video.addEventListener('playing', () => loaderHud.classList.add('hidden'));
+    video.addEventListener('waiting', () => loaderHud.classList.remove('hidden'));
 
-      playerInstance.addEventListener('error', (event) => {
-        console.error('Shaka player internal error:', event.detail);
-        showError("DRM Session Failed", "Unable to decrypt or decode the live video stream. The stream token or channel license Keys may have expired.<br><br>Error Code: " + event.detail.code);
-      });
+    playOverlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePlay();
+    });
+    btnBottomPlay.addEventListener('click', togglePlay);
+    btnErrorRetry.addEventListener('click', () => {
+      loadHlsStream(STREAM_URL);
+    });
 
-      playerInstance.addEventListener('trackschanged', updateTracksAndLanguages);
-      playerInstance.addEventListener('variantchanged', updateTracksAndLanguages);
-      playerInstance.addEventListener('adaptation', updateTracksAndLanguages);
+    // Mute/Volume toggles
+    btnVolumeToggle.addEventListener('click', function() {
+      video.muted = !video.muted;
+      updateVolumeUI();
+    });
 
-      try {
-        await playerInstance.load(playableUrl);
-        loadingSpinner.style.opacity = '0';
-        setTimeout(() => loadingSpinner.classList.add('hidden'), 300);
-        
-        updateTracksAndLanguages();
-
+    volumeSlider.addEventListener('input', function() {
+      video.volume = volumeSlider.value;
+      if (video.volume > 0) {
         video.muted = false;
-        try {
-          await video.play();
-          setMuteState(false);
-        } catch (autoplayErr) {
-          console.log("Autoplay unmuted blocked. Gracefully fell back to muted autoplay.");
-          setMuteState(true);
-          await video.play();
-        }
-      } catch (err) {
-        console.error('Failed to load stream', err);
-        showError("Connection Failed", "Unable to establish connections to the network stream host. Make sure the link is live and CORS is active on the stream server.");
+      }
+      updateVolumeUI();
+    });
+
+    function updateVolumeUI() {
+      if (video.muted || video.volume === 0) {
+        btnVolumeIcon.setAttribute('data-lucide', 'volume-x');
+        volumeSlider.value = 0;
+      } else {
+        btnVolumeIcon.setAttribute('data-lucide', 'volume-2');
+        volumeSlider.value = video.volume;
+      }
+      lucide.createIcons();
+    }
+
+    // 90deg video display rotation
+    btnRotateView.addEventListener('click', function() {
+      rotationAngle = (rotationAngle + 90) % 360;
+      viewportWrapper.style.transform = `rotate(${rotationAngle}deg)`;
+      rotateIconIndicator.className = `w-4 h-4 transition-transform ${rotationAngle !== 0 ? 'text-red-400 rotate-90' : ''}`;
+      
+      // Auto-scale correctly in portrait rotational coordinates
+      if (rotationAngle === 90 || rotationAngle === 270) {
+        viewportWrapper.style.transform += ` scale(0.56)`;
+      } else {
+        viewportWrapper.style.transform += ` scale(1)`;
+      }
+    });
+
+    // Fullscreen view toggles
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+    playerContainer.addEventListener('dblclick', toggleFullscreen);
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        playerContainer.requestFullscreen().then(() => {
+          btnFullscreenIcon.setAttribute('data-lucide', 'minimize');
+          lucide.createIcons();
+        }).catch(err => {
+          console.warn("Fullscreen bounds blocked inside sandboxed iFrame preview mode.");
+        });
+      } else {
+        document.exitFullscreen().then(() => {
+          btnFullscreenIcon.setAttribute('data-lucide', 'maximize');
+          lucide.createIcons();
+        });
       }
     }
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      setTimeout(initShaka, 10);
-    } else {
-      document.addEventListener('DOMContentLoaded', initShaka);
+    // Hotkey handler (Spacebar pause bounds)
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      }
+    });
+
+    // Smart Mouse movement Control-panel fading detection
+    function resetIdleTimer() {
+      controlsPanel.style.opacity = '1';
+      clearTimeout(idleTimer);
+      if (!video.paused) {
+        idleTimer = setTimeout(() => {
+          controlsPanel.style.opacity = '0';
+        }, 4000);
+      }
     }
+
+    playerContainer.addEventListener('mousemove', resetIdleTimer);
+    playerContainer.addEventListener('touchstart', resetIdleTimer);
+
+    // Initial load process
+    updateHUDLabels();
+    loadHlsStream(STREAM_URL);
+
   </script>
 </body>
 </html>
