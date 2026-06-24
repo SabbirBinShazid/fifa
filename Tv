@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSports Live • For Muna ❤️</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Inter:wght@300;400;500;600&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #020205;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* Premium Interactive Splash Screen */
+        #splash {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1a0022 0%, #07000d 80%, #020205 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.8s;
+        }
+        
+        .splash-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 50px 70px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 51, 102, 0.15);
+            text-align: center;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            animation: fadeInScale 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 2;
+        }
+
+        @keyframes fadeInScale {
+            0% { opacity: 0; transform: scale(0.85); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        .heart {
+            font-size: 70px;
+            animation: pulse 1.4s infinite ease-in-out;
+            color: #ff3366;
+            filter: drop-shadow(0 0 30px rgba(255, 51, 102, 0.6));
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(255, 51, 102, 0.5)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 40px rgba(255, 51, 102, 0.8)); }
+        }
+        
+        h1 {
+            font-family: 'Great Vibes', cursive;
+            font-size: 4.8rem;
+            background: linear-gradient(180deg, #ffffff 0%, #ffe6ef 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            font-size: 0.9rem;
+            color: #ff80aa;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            font-weight: 400;
+            opacity: 0.85;
+            margin-bottom: 30px;
+        }
+
+        /* Action Gateway Button */
+        .enter-btn {
+            background: linear-gradient(135deg, #ff3366 0%, #cc0052 100%);
+            color: white;
+            border: none;
+            padding: 14px 36px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(255, 51, 102, 0.35);
+            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .enter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(255, 51, 102, 0.5);
+        }
+
+        .enter-btn:active {
+            transform: translateY(1px);
+        }
+        
+        .floating-hearts {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .heart-float {
+            position: absolute;
+            color: #ff3366;
+            opacity: 0;
+            animation: floatHeart linear forwards;
+        }
+        
+        @keyframes floatHeart {
+            0% { transform: translateY(105vh) scale(0.4); opacity: 0; }
+            15% { opacity: 0.5; }
+            85% { opacity: 0.3; }
+            100% { transform: translateY(-10vh) scale(1.1) rotate(120deg); opacity: 0; }
+        }
+        
+        /* Video Container Environment */
+        #video-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.95rem;
+            font-weight: 400;
+            letter-spacing: 1.5px;
+            z-index: 10;
+            background: rgba(5, 5, 10, 0.75);
+            padding: 16px 32px;
+            border-radius: 40px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top-color: #ff3366;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Video Shading Vignette Overlay */
+        .vignette {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.6) 100%);
+            z-index: 2;
+        }
+
+        /* Professional Modern Control Bar Structure */
+        .controls-wrapper {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%;
+            padding: 40px 30px 30px 30px;
+            background: linear-gradient(to top, rgba(2, 2, 5, 0.95) 0%, rgba(2, 2, 5, 0.7) 50%, transparent 100%);
+            z-index: 10;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .controls-wrapper.hidden {
+            opacity: 0;
+            transform: translateY(15px);
+            pointer-events: none;
+        }
+
+        .controls-bar {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .controls-left, .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.8);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, background 0.2s, transform 0.1s;
+        }
+
+        .control-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        .control-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Live Identity Badge */
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: #ffffff;
+            padding: 6px 14px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            margin-left: 8px;
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: #00ff66;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff66;
+            animation: broadcastPulse 1.5s infinite;
+        }
+
+        @keyframes broadcastPulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Splash Screen Gateway -->
+    <div id="splash">
+        <div class="floating-hearts" id="hearts"></div>
+        <div class="splash-card">
+            <div class="heart">❤️</div>
+            <h1>Love You Muna</h1>
+            <p class="subtitle">Forever & Always</p>
+            <button class="enter-btn" id="start-btn">
+                <span>Enter Live Stream</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Video Player Interface -->
+    <div id="video-container">
+        <video id="video" playsinline></video>
+        <div class="vignette"></div>
+        
+        <div id="loading">
+            <div class="spinner"></div>
+            <span>Connecting to TSports Live</span>
+        </div>
+        
+        <!-- Premium Stream Navigation HUD -->
+        <div class="controls-wrapper" id="controls-panel">
+            <div class="controls-bar">
+                <div class="controls-left">
+                    <button id="play-btn" class="control-btn" title="Play/Pause">
+                        <svg id="icon-pause" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        <svg id="icon-play" viewBox="0 0 24 24" style="display:none;"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    
+                    <button id="mute-btn" class="control-btn" title="Mute/Unmute">
+                        <svg id="icon-unmute" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+                        <svg id="icon-mute" viewBox="0 0 24 24" style="display:none;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+                    </button>
+
+                    <div class="live-badge">
+                        <div class="live-dot"></div>
+                        <span>LIVE</span>
+                    </div>
+                </div>
+
+                <div class="controls-right">
+                    <button id="fullscreen-btn" class="control-btn" title="Fullscreen">
+                        <svg id="icon-fs-enter" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                        <svg id="icon-fs-exit" viewBox="0 0 24 24" style="display:none;"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const splash = document.getElementById('splash');
+        const videoContainer = document.getElementById('video-container');
+        const loading = document.getElementById('loading');
+        const startBtn = document.getElementById('start-btn');
+        
+        const controlsPanel = document.getElementById('controls-panel');
+        const playBtn = document.getElementById('play-btn');
+        const muteBtn = document.getElementById('mute-btn');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+
+        const iconPlay = document.getElementById('icon-play');
+        const iconPause = document.getElementById('icon-pause');
+        const iconMute = document.getElementById('icon-mute');
+        const iconUnmute = document.getElementById('icon-unmute');
+        const iconFsEnter = document.getElementById('icon-fs-enter');
+        const iconFsExit = document.getElementById('icon-fs-exit');
+
+        const streamUrl = 'https://trs1.aynaott.com/tsports/tracks-v1a1/mono.ts.m3u8';
+        let idleTimer = null;
+        
+        // Assert unmuted variables immediately
+        video.muted = false; 
+
+        function createFloatingHeart() {
+            const heart = document.createElement('div');
+            heart.className = 'heart-float';
+            heart.textContent = ['❤️','💖','💗','💘','💝'][Math.floor(Math.random()*5)];
+            heart.style.left = Math.random() * 100 + 'vw';
+            heart.style.animationDuration = (Math.random() * 3 + 4) + 's';
+            heart.style.fontSize = (Math.random() * 16 + 20) + 'px';
+            document.getElementById('hearts').appendChild(heart);
+            setTimeout(() => heart.remove(), 7000);
+        }
+
+        function startHearts() {
+            setInterval(createFloatingHeart, 280);
+            for (let i = 0; i < 12; i++) setTimeout(createFloatingHeart, i * 70);
+        }
+
+        function initPlayer() {
+            if (Hls.isSupported()) {
+                const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                hls.loadSource(streamUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => executePlayback());
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = streamUrl;
+                video.addEventListener('loadedmetadata', () => executePlayback());
+            }
+        }
+
+        // Guaranteed Unmuted Autoplay execution path
+        function executePlayback() {
+            loading.style.display = 'none';
+            video.muted = false; // Ensure audio track state is explicitly verified unmuted
+            video.play().then(() => {
+                updatePlayUI();
+                resetIdleTimer();
+            }).catch((err) => {
+                console.log("Playback engine handled error:", err);
+            });
+        }
+
+        function handlePlayPause() {
+            if (video.paused) {
+                if (video.seekable && video.seekable.length > 0) {
+                    video.currentTime = video.seekable.end(video.seekable.length - 1);
+                } else if (video.duration) {
+                    video.currentTime = video.duration;
+                }
+                video.play();
+            } else {
+                video.pause();
+            }
+        }
+
+        function updatePlayUI() {
+            if (video.paused) {
+                iconPlay.style.display = 'block';
+                iconPause.style.display = 'none';
+            } else {
+                iconPlay.style.display = 'none';
+                iconPause.style.display = 'block';
+            }
+        }
+
+        function handleMuteToggle() {
+            video.muted = !video.muted;
+            if (video.muted) {
+                iconMute.style.display = 'block';
+                iconUnmute.style.display = 'none';
+            } else {
+                iconMute.style.display = 'none';
+                iconUnmute.style.display = 'block';
+            }
+        }
+
+        function handleFullscreenToggle() {
+            if (!document.fullscreenElement) {
+                videoContainer.requestFullscreen().then(() => {
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(() => {});
+                    }
+                }).catch(() => {});
+                iconFsEnter.style.display = 'none';
+                iconFsExit.style.display = 'block';
+            } else {
+                document.exitFullscreen();
+                iconFsEnter.style.display = 'block';
+                iconFsExit.style.display = 'none';
+            }
+        }
+
+        function showControls() {
+            controlsPanel.classList.remove('hidden');
+            document.body.style.cursor = 'default';
+        }
+
+        function hideControls() {
+            if (!video.paused) {
+                controlsPanel.classList.add('hidden');
+                document.body.style.cursor = 'none';
+            }
+        }
+
+        function resetIdleTimer() {
+            showControls();
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(hideControls, 3000); 
+        }
+
+        // Setup Gateway Event Triggers
+        startBtn.addEventListener('click', () => {
+            splash.style.opacity = '0';
+            setTimeout(() => {
+                splash.style.display = 'none';
+                videoContainer.style.display = 'block';
+                setTimeout(() => videoContainer.style.opacity = '1', 50);
+                initPlayer(); // Fires immediately within user input thread context window
+            }, 800);
+        });
+
+        playBtn.addEventListener('click', (e) => { e.stopPropagation(); handlePlayPause(); resetIdleTimer(); });
+        muteBtn.addEventListener('click', (e) => { e.stopPropagation(); handleMuteToggle(); resetIdleTimer(); });
+        fullscreenBtn.addEventListener('click', (e) => { e.stopPropagation(); handleFullscreenToggle(); resetIdleTimer(); });
+        
+        // Background layout context mapping (Wakes up bar, doesn't toggle pauses)
+        videoContainer.addEventListener('click', (e) => {
+            if (e.target === video || e.target.classList.contains('vignette')) {
+                resetIdleTimer();
+            }
+        });
+
+        videoContainer.addEventListener('mousemove', resetIdleTimer);
+        videoContainer.addEventListener('touchstart', resetIdleTimer);
+
+        video.addEventListener('play', updatePlayUI);
+        video.addEventListener('pause', updatePlayUI);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                handlePlayPause();
+                resetIdleTimer();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                iconFsEnter.style.display = 'block';
+                iconFsExit.style.display = 'none';
+                if (screen.orientation && screen.orientation.unlock) {
+                    screen.orientation.unlock();
+                }
+            }
+        });
+
+        window.onload = startHearts;
+    </script>
+</body>
+</html>
