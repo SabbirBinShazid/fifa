@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+            <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -31,14 +31,16 @@
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.8s;
+            transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.6s;
         }
         
         .splash-card {
             background: rgba(255, 255, 255, 0.02);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            padding: 50px 70px;
+            padding: 50px 40px;
+            width: 90%;
+            max-width: 420px;
             border-radius: 28px;
             border: 1px solid rgba(255, 51, 102, 0.15);
             text-align: center;
@@ -53,7 +55,7 @@
         }
         
         .heart {
-            font-size: 70px;
+            font-size: 60px;
             animation: pulse 1.4s infinite ease-in-out;
             color: #ff3366;
             filter: drop-shadow(0 0 30px rgba(255, 51, 102, 0.6));
@@ -68,7 +70,7 @@
         
         h1 {
             font-family: 'Great Vibes', cursive;
-            font-size: 4.8rem;
+            font-size: 4rem;
             background: linear-gradient(180deg, #ffffff 0%, #ffe6ef 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -76,13 +78,13 @@
         }
         
         .subtitle {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #ff80aa;
             letter-spacing: 4px;
             text-transform: uppercase;
             font-weight: 400;
             opacity: 0.85;
-            margin-bottom: 30px;
+            margin-bottom: 35px;
         }
 
         /* Action Gateway Button */
@@ -90,7 +92,7 @@
             background: linear-gradient(135deg, #ff3366 0%, #cc0052 100%);
             color: white;
             border: none;
-            padding: 14px 36px;
+            padding: 16px 40px;
             font-family: 'Inter', sans-serif;
             font-size: 0.95rem;
             font-weight: 600;
@@ -98,19 +100,15 @@
             border-radius: 50px;
             cursor: pointer;
             box-shadow: 0 10px 30px rgba(255, 51, 102, 0.35);
-            transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 10px;
-        }
-
-        .enter-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 35px rgba(255, 51, 102, 0.5);
+            -webkit-tap-highlight-color: transparent;
         }
 
         .enter-btn:active {
-            transform: translateY(1px);
+            transform: scale(0.98);
         }
         
         .floating-hearts {
@@ -144,7 +142,7 @@
             background: #000;
             display: none;
             opacity: 0;
-            transition: opacity 0.5s ease-in;
+            transition: opacity 0.4s ease-in;
         }
         
         video {
@@ -158,12 +156,11 @@
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             color: rgba(255, 255, 255, 0.9);
-            font-size: 0.95rem;
-            font-weight: 400;
+            font-size: 0.9rem;
             letter-spacing: 1.5px;
             z-index: 10;
-            background: rgba(5, 5, 10, 0.75);
-            padding: 16px 32px;
+            background: rgba(5, 5, 10, 0.8);
+            padding: 14px 28px;
             border-radius: 40px;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -186,7 +183,6 @@
             to { transform: rotate(360deg); }
         }
         
-        /* Video Shading Vignette Overlay */
         .vignette {
             position: absolute;
             top: 0; left: 0;
@@ -195,20 +191,20 @@
             z-index: 2;
         }
 
-        /* Professional Modern Control Bar Structure */
+        /* Control Bar Structure */
         .controls-wrapper {
             position: absolute;
             bottom: 0; left: 0;
             width: 100%;
-            padding: 40px 30px 30px 30px;
-            background: linear-gradient(to top, rgba(2, 2, 5, 0.95) 0%, rgba(2, 2, 5, 0.7) 50%, transparent 100%);
+            padding: 40px 24px 24px 24px;
+            background: linear-gradient(to top, rgba(2, 2, 5, 0.95) 0%, rgba(2, 2, 5, 0.4) 70%, transparent 100%);
             z-index: 10;
             transition: opacity 0.4s ease, transform 0.4s ease;
         }
 
         .controls-wrapper.hidden {
             opacity: 0;
-            transform: translateY(15px);
+            transform: translateY(10px);
             pointer-events: none;
         }
 
@@ -223,7 +219,7 @@
         .controls-left, .controls-right {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
 
         .control-btn {
@@ -237,7 +233,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s, background 0.2s, transform 0.1s;
+            transition: color 0.2s, background 0.2s;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .control-btn svg {
@@ -251,24 +248,19 @@
             background: rgba(255, 255, 255, 0.1);
         }
 
-        .control-btn:active {
-            transform: scale(0.95);
-        }
-
-        /* Live Identity Badge */
+        /* Live Badge */
         .live-badge {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.75rem;
+            gap: 6px;
+            font-size: 0.7rem;
             font-weight: 600;
             letter-spacing: 1.5px;
             color: #ffffff;
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 6px;
             background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            margin-left: 8px;
+            margin-left: 4px;
         }
 
         .live-dot {
@@ -281,9 +273,8 @@
         }
 
         @keyframes broadcastPulse {
-            0% { opacity: 0.5; }
+            0%, 100% { opacity: 0.5; }
             50% { opacity: 1; }
-            100% { opacity: 0.5; }
         }
     </style>
 </head>
@@ -305,7 +296,8 @@
 
     <!-- Video Player Interface -->
     <div id="video-container">
-        <video id="video" playsinline></video>
+        <!-- added playsinline and webkit-playsinline specifically for iPhone Safari native support -->
+        <video id="video" playsinline webkit-playsinline></video>
         <div class="vignette"></div>
         
         <div id="loading">
@@ -365,7 +357,6 @@
         const streamUrl = 'https://trs1.aynaott.com/tsports/tracks-v1a1/mono.ts.m3u8';
         let idleTimer = null;
         
-        // Assert unmuted variables immediately
         video.muted = false; 
 
         function createFloatingHeart() {
@@ -380,31 +371,31 @@
         }
 
         function startHearts() {
-            setInterval(createFloatingHeart, 280);
-            for (let i = 0; i < 12; i++) setTimeout(createFloatingHeart, i * 70);
+            setInterval(createFloatingHeart, 350);
+            for (let i = 0; i < 8; i++) setTimeout(createFloatingHeart, i * 100);
         }
 
         function initPlayer() {
-            if (Hls.isSupported()) {
+            // iOS Safari handles HLS (.m3u8) natively out of the box and bypasses hls.js
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = streamUrl;
+                executePlayback();
+            } else if (Hls.isSupported()) {
                 const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
                 hls.loadSource(streamUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => executePlayback());
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = streamUrl;
-                video.addEventListener('loadedmetadata', () => executePlayback());
             }
         }
 
-        // Guaranteed Unmuted Autoplay execution path
         function executePlayback() {
             loading.style.display = 'none';
-            video.muted = false; // Ensure audio track state is explicitly verified unmuted
+            video.muted = false; 
             video.play().then(() => {
                 updatePlayUI();
                 resetIdleTimer();
             }).catch((err) => {
-                console.log("Playback engine handled error:", err);
+                console.log("Playback error: ", err);
             });
         }
 
@@ -412,8 +403,6 @@
             if (video.paused) {
                 if (video.seekable && video.seekable.length > 0) {
                     video.currentTime = video.seekable.end(video.seekable.length - 1);
-                } else if (video.duration) {
-                    video.currentTime = video.duration;
                 }
                 video.play();
             } else {
@@ -442,8 +431,13 @@
             }
         }
 
+        // Fixed iPhone compatible Fullscreen Handler
         function handleFullscreenToggle() {
-            if (!document.fullscreenElement) {
+            if (video.webkitEnterFullscreen) {
+                // iPhone native Safari approach
+                video.webkitEnterFullscreen();
+            } else if (!document.fullscreenElement) {
+                // Desktop / Android approach
                 videoContainer.requestFullscreen().then(() => {
                     if (screen.orientation && screen.orientation.lock) {
                         screen.orientation.lock('landscape').catch(() => {});
@@ -460,13 +454,11 @@
 
         function showControls() {
             controlsPanel.classList.remove('hidden');
-            document.body.style.cursor = 'default';
         }
 
         function hideControls() {
             if (!video.paused) {
                 controlsPanel.classList.add('hidden');
-                document.body.style.cursor = 'none';
             }
         }
 
@@ -476,22 +468,21 @@
             idleTimer = setTimeout(hideControls, 3000); 
         }
 
-        // Setup Gateway Event Triggers
+        // iOS COMPLIANT: initPlayer() triggers IMMEDIATELY on click to keep trust chain token active
         startBtn.addEventListener('click', () => {
+            initPlayer(); 
             splash.style.opacity = '0';
+            videoContainer.style.display = 'block';
             setTimeout(() => {
                 splash.style.display = 'none';
-                videoContainer.style.display = 'block';
-                setTimeout(() => videoContainer.style.opacity = '1', 50);
-                initPlayer(); // Fires immediately within user input thread context window
-            }, 800);
+                videoContainer.style.opacity = '1';
+            }, 600);
         });
 
         playBtn.addEventListener('click', (e) => { e.stopPropagation(); handlePlayPause(); resetIdleTimer(); });
         muteBtn.addEventListener('click', (e) => { e.stopPropagation(); handleMuteToggle(); resetIdleTimer(); });
         fullscreenBtn.addEventListener('click', (e) => { e.stopPropagation(); handleFullscreenToggle(); resetIdleTimer(); });
         
-        // Background layout context mapping (Wakes up bar, doesn't toggle pauses)
         videoContainer.addEventListener('click', (e) => {
             if (e.target === video || e.target.classList.contains('vignette')) {
                 resetIdleTimer();
@@ -504,21 +495,10 @@
         video.addEventListener('play', updatePlayUI);
         video.addEventListener('pause', updatePlayUI);
 
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                handlePlayPause();
-                resetIdleTimer();
-            }
-        });
-
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
                 iconFsEnter.style.display = 'block';
                 iconFsExit.style.display = 'none';
-                if (screen.orientation && screen.orientation.unlock) {
-                    screen.orientation.unlock();
-                }
             }
         });
 
